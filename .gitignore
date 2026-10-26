@@ -1,0 +1,17 @@
+# Test files
+*.log
+*.tmp
+*.bak
+
+# OpenWrt specific
+/tmp/
+
+# Editor files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
