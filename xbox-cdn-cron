@@ -1,0 +1,49 @@
+#!/bin/sh
+# Xbox CDN - crontab manager
+# Usage: xbox-cdn-cron enable <hour> <min> | disable
+
+CRONTAB_FILE="/etc/crontabs/root"
+CRON_TAG="# xbox-cdn-speedtest"
+
+case "$1" in
+    enable)
+        HOUR="${2:-3}"
+        MIN="${3:-0}"
+        MODE=$(uci -q get xbox-cdn.settings.mode 2>/dev/null)
+        [ -z "$MODE" ] && MODE="dnsmasq"
+
+        # Remove existing xbox-cdn entry
+        if [ -f "$CRONTAB_FILE" ]; then
+            sed -i "/$CRON_TAG/d" "$CRONTAB_FILE"
+        fi
+
+        # Add new entry
+        echo "$MIN $HOUR * * * /usr/bin/xbox-speedtest.sh --mode $MODE --apply >/dev/null 2>&1 $CRON_TAG" >> "$CRONTAB_FILE"
+
+        # Reload cron
+        /etc/init.d/cron restart >/dev/null 2>&1
+
+        echo "OK: cron enabled at ${HOUR}:$(printf '%02d' $MIN)"
+        ;;
+
+    disable)
+        if [ -f "$CRONTAB_FILE" ]; then
+            sed -i "/$CRON_TAG/d" "$CRONTAB_FILE"
+        fi
+        /etc/init.d/cron restart >/dev/null 2>&1
+        echo "OK: cron disabled"
+        ;;
+
+    status)
+        if [ -f "$CRONTAB_FILE" ] && grep -q "$CRON_TAG" "$CRONTAB_FILE"; then
+            grep "$CRON_TAG" "$CRONTAB_FILE"
+        else
+            echo "disabled"
+        fi
+        ;;
+
+    *)
+        echo "Usage: $0 {enable <hour> <min>|disable|status}"
+        exit 1
+        ;;
+esac

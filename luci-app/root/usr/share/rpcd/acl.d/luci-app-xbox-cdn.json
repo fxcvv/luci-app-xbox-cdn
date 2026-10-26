@@ -1,0 +1,33 @@
+{
+	"luci-app-xbox-cdn": {
+		"description": "Grant UCI and file access for Xbox CDN LuCI app",
+		"read": {
+			"uci": [ "xbox-cdn" ],
+			"cgi-io": [ "exec" ],
+			"file": {
+				"/tmp/xbox-speedtest.log": [ "read" ],
+				"/tmp/xbox-cdn-status.json": [ "read" ],
+				"/etc/smartdns/conf.d/xbox-cdn.conf": [ "read" ],
+				"/tmp/dnsmasq.d/xbox-cdn.conf": [ "read" ],
+				"/etc/crontabs/root": [ "read" ],
+				"/usr/bin/xbox-cdn-run": [ "exec" ],
+				"/usr/bin/xbox-cdn-run start": [ "exec" ],
+				"/usr/bin/xbox-cdn-run status": [ "exec" ],
+				"/usr/bin/xbox-cdn-run log": [ "exec" ],
+				"/usr/bin/xbox-cdn-run current-config": [ "exec" ],
+				"/usr/bin/xbox-cdn-cron": [ "exec" ],
+				"/usr/bin/xbox-cdn-cron enable": [ "exec" ],
+				"/usr/bin/xbox-cdn-cron enable *": [ "exec" ],
+				"/usr/bin/xbox-cdn-cron disable": [ "exec" ],
+				"/usr/bin/xbox-cdn-cron status": [ "exec" ]
+			}
+		},
+		"write": {
+			"uci": [ "xbox-cdn" ],
+			"cgi-io": [ "exec" ],
+			"file": {
+				"/etc/crontabs/root": [ "write" ]
+			}
+		}
+	}
+}

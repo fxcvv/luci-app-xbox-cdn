@@ -1,0 +1,57 @@
+#!/bin/sh
+# Xbox CDN Speedtest - Background launcher + status manager
+# Called by luci-app-xbox-cdn
+
+STATUS_FILE="/tmp/xbox-cdn-status.json"
+LOG_FILE="/tmp/xbox-speedtest.log"
+SCRIPT="/usr/bin/xbox-speedtest.sh"
+UCI_MODE=$(uci -q get xbox-cdn.settings.mode 2>/dev/null)
+[ -z "$UCI_MODE" ] && UCI_MODE="dnsmasq"
+
+case "$1" in
+    start)
+        # Check if already running
+        if [ -f "$STATUS_FILE" ] && grep -q '"state": "running"' "$STATUS_FILE" 2>/dev/null; then
+            echo '{"state":"running","msg":"already running"}'
+            exit 0
+        fi
+
+        # Truncate log and launch fully detached via start-stop-daemon
+        : > "$LOG_FILE"
+        start-stop-daemon -S -b -O "$LOG_FILE" -x /usr/bin/xbox-speedtest.sh -- --mode "$UCI_MODE" --apply
+        echo '{"state":"started"}'
+        ;;
+
+    status)
+        if [ -f "$STATUS_FILE" ]; then
+            cat "$STATUS_FILE"
+        else
+            echo '{"state":"idle","last_run":"","mode":"'$UCI_MODE'"}'
+        fi
+        ;;
+
+    log)
+        if [ -f "$LOG_FILE" ]; then
+            tail -n 100 "$LOG_FILE"
+        fi
+        ;;
+
+    current-config)
+        # Show current applied config
+        case "$UCI_MODE" in
+            smartdns) CONF="/etc/smartdns/conf.d/xbox-cdn.conf" ;;
+            *)        CONF="/tmp/dnsmasq.d/xbox-cdn.conf" ;;
+        esac
+        if [ -f "$CONF" ]; then
+            echo "=== 当前生效配置 ($CONF) ==="
+            cat "$CONF"
+        else
+            echo "尚未生成配置"
+        fi
+        ;;
+
+    *)
+        echo "Usage: $0 {start|status|log|current-config}"
+        exit 1
+        ;;
+esac

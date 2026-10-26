@@ -1,0 +1,14 @@
+{
+	"admin/services/xbox-cdn": {
+		"title": "Xbox CDN 优化",
+		"order": 65,
+		"action": {
+			"type": "view",
+			"path": "xbox-cdn/cdn"
+		},
+		"depends": {
+			"acl": [ "luci-app-xbox-cdn" ],
+			"uci": { "xbox-cdn": true }
+		}
+	}
+}

@@ -1,107 +1,122 @@
 #!/bin/sh
-# Xbox CDN Speedtest Installer for OpenWrt
+# Xbox CDN Speedtest - Installer
+# https://github.com/fxcvv/xbox-cdn-speedtest
 
 set -e
 
-INSTALL_DIR="/etc"
-SCRIPT_NAME="xbox-speedtest.sh"
-CONFIG_NAME="xbox-cdn-ips.conf"
-CRON_TIME="30 3"  # 默认凌晨 3:30
+INSTALL_DIR="/usr/bin"
+CDN_IP_FILE="/etc/xbox-cdn-ips.conf"
 
-echo "=== Xbox CDN Speedtest 安装程序 ==="
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+log_ok()   { echo "${GREEN}✓${NC} $*"; }
+log_warn() { echo "${YELLOW}!${NC} $*"; }
+log_err()  { echo "${RED}✗${NC} $*"; }
+
+echo "======================================"
+echo " Xbox CDN Speedtest Installer"
+echo "======================================"
 echo ""
 
-# 检查依赖
-echo "检查系统依赖..."
-missing=""
-for cmd in curl flock awk grep sed; do
-    if ! command -v "$cmd" >/dev/null 2>&1; then
-        missing="$missing $cmd"
-    fi
+# Check dependencies
+echo ">> Checking dependencies..."
+MISSING=""
+for cmd in curl flock awk grep sed netstat; do
+    command -v "$cmd" >/dev/null 2>&1 || MISSING="$MISSING $cmd"
 done
-
-if [ -n "$missing" ]; then
-    echo "错误: 缺少依赖:$missing"
-    echo "请先安装: opkg update && opkg install$missing"
-    exit 1
+if [ -n "$MISSING" ]; then
+    log_warn "Missing:$MISSING"
+    log_warn "Install with: opkg update && opkg install$MISSING"
 fi
 
-# 检查 curl HTTP/2 支持
-if ! curl --version 2>&1 | grep -q "HTTP2"; then
-    echo "警告: curl 不支持 HTTP/2，建议安装 curl-openssl"
-    echo "      opkg update && opkg install curl"
-fi
-
-# 安装脚本
+# Detect DNS mode
 echo ""
-echo "安装脚本到 $INSTALL_DIR/$SCRIPT_NAME ..."
-if [ -f "$INSTALL_DIR/$SCRIPT_NAME" ]; then
-    cp "$INSTALL_DIR/$SCRIPT_NAME" "$INSTALL_DIR/$SCRIPT_NAME.bak"
-    echo "  已备份旧版本: $INSTALL_DIR/$SCRIPT_NAME.bak"
-fi
-cp "$SCRIPT_NAME" "$INSTALL_DIR/$SCRIPT_NAME"
-chmod +x "$INSTALL_DIR/$SCRIPT_NAME"
-echo "  ✓ 脚本安装完成"
+echo ">> Detecting DNS service on port 53..."
+DETECTED=$(netstat -ulnp 2>/dev/null | awk '/:53 /{print $NF}' | grep -o '[a-zA-Z]*$' | head -1)
+case "$DETECTED" in
+    smartdns) DEFAULT_MODE="smartdns"; log_ok "Detected SmartDNS on port 53" ;;
+    dnsmasq)  DEFAULT_MODE="dnsmasq";  log_ok "Detected dnsmasq on port 53" ;;
+    *)        DEFAULT_MODE="dnsmasq";  log_warn "Could not detect, defaulting to dnsmasq" ;;
+esac
 
-# 安装 CDN IP 配置
+# Ask user
 echo ""
-echo "安装 CDN IP 配置到 $INSTALL_DIR/$CONFIG_NAME ..."
-if [ -f "$INSTALL_DIR/$CONFIG_NAME" ]; then
-    echo "  配置文件已存在，跳过（保留你的自定义配置）"
+printf ">> Output target [smartdns/dnsmasq] (default: $DEFAULT_MODE): "
+read -r USER_MODE
+[ -z "$USER_MODE" ] && USER_MODE="$DEFAULT_MODE"
+case "$USER_MODE" in
+    smartdns|dnsmasq) ;;
+    *) log_err "Invalid mode '$USER_MODE'"; exit 1 ;;
+esac
+log_ok "Using mode: $USER_MODE"
+
+# Install scripts
+echo ""
+echo ">> Installing scripts..."
+install -m 755 xbox-speedtest.sh "$INSTALL_DIR/xbox-speedtest.sh"
+install -m 755 xbox-cdn-run      "$INSTALL_DIR/xbox-cdn-run"
+install -m 755 xbox-cdn-cron     "$INSTALL_DIR/xbox-cdn-cron"
+log_ok "Scripts installed to $INSTALL_DIR"
+
+# Install CDN IP list
+install -m 644 cdn-ips.conf "$CDN_IP_FILE"
+log_ok "CDN IP list installed to $CDN_IP_FILE"
+
+# Install UCI config
+if [ ! -f /etc/config/xbox-cdn ]; then
+    cat > /etc/config/xbox-cdn << EOF
+config settings 'settings'
+	option mode '$USER_MODE'
+	option cron_enabled '0'
+	option cron_hour '3'
+	option cron_min '0'
+EOF
+    log_ok "UCI config created: /etc/config/xbox-cdn"
 else
-    cp "$CONFIG_NAME" "$INSTALL_DIR/$CONFIG_NAME"
-    echo "  ✓ 配置文件安装完成"
+    uci set xbox-cdn.settings.mode="$USER_MODE"
+    uci commit xbox-cdn
+    log_ok "UCI config updated (mode=$USER_MODE)"
 fi
 
-# 创建 dnsmasq 配置目录
-echo ""
-echo "配置 dnsmasq ..."
-if ! grep -q "conf-dir=/tmp/dnsmasq.d" /etc/dnsmasq.conf 2>/dev/null; then
-    echo "conf-dir=/tmp/dnsmasq.d" >> /etc/dnsmasq.conf
-    echo "  ✓ 已添加 dnsmasq 配置目录"
-else
-    echo "  dnsmasq 配置目录已存在"
-fi
-mkdir -p /tmp/dnsmasq.d
-
-# 询问是否添加定时任务
-echo ""
-read -p "是否添加定时任务？(y/n，默认 y): " add_cron
-add_cron="${add_cron:-y}"
-
-if [ "$add_cron" = "y" ] || [ "$add_cron" = "Y" ]; then
-    echo "  设置定时任务时间（格式: 分钟 小时，例如: 30 3 表示 3:30）"
-    read -p "  默认 [$CRON_TIME]: " user_time
-    user_time="${user_time:-$CRON_TIME}"
-    
-    cron_entry="$user_time * * * $INSTALL_DIR/$SCRIPT_NAME"
-    
-    # 移除旧的任务
-    grep -v "$SCRIPT_NAME" /etc/crontabs/root > /tmp/crontab.tmp 2>/dev/null || touch /tmp/crontab.tmp
-    echo "$cron_entry" >> /tmp/crontab.tmp
-    mv /tmp/crontab.tmp /etc/crontabs/root
-    
-    /etc/init.d/cron restart
-    echo "  ✓ 定时任务已添加: 每天 $(echo $user_time | awk '{print $2":"$1}') 运行"
-fi
-
-# 询问是否立即运行
-echo ""
-read -p "是否立即运行一次测速？(y/n，默认 y): " run_now
-run_now="${run_now:-y}"
-
-if [ "$run_now" = "y" ] || [ "$run_now" = "Y" ]; then
+# Install LuCI app
+if [ -d luci-app/root ]; then
     echo ""
-    echo "=== 开始测速 ==="
-    "$INSTALL_DIR/$SCRIPT_NAME"
+    echo ">> Installing LuCI app..."
+    cp luci-app/root/usr/share/luci/menu.d/luci-app-xbox-cdn.json \
+       /usr/share/luci/menu.d/ 2>/dev/null && \
+    cp luci-app/root/usr/share/rpcd/acl.d/luci-app-xbox-cdn.json \
+       /usr/share/rpcd/acl.d/ 2>/dev/null && \
+    mkdir -p /www/luci-static/resources/view/xbox-cdn && \
+    cp luci-app/root/www/luci-static/resources/view/xbox-cdn/cdn.js \
+       /www/luci-static/resources/view/xbox-cdn/ 2>/dev/null && \
+    /etc/init.d/rpcd restart >/dev/null 2>&1 && \
+    log_ok "LuCI app installed (Services → Xbox CDN 优化)" || \
+    log_warn "LuCI app install failed (optional, CLI still works)"
+fi
+
+# Cron setup
+echo ""
+printf ">> Enable scheduled speed test? [y/N]: "
+read -r CRON_ENABLE
+if [ "$CRON_ENABLE" = "y" ] || [ "$CRON_ENABLE" = "Y" ]; then
+    printf ">> Run at hour [0-23] (default: 3): "
+    read -r CRON_HOUR
+    [ -z "$CRON_HOUR" ] && CRON_HOUR=3
+    xbox-cdn-cron enable "$CRON_HOUR" 0
+    uci set xbox-cdn.settings.cron_enabled=1
+    uci set xbox-cdn.settings.cron_hour="$CRON_HOUR"
+    uci commit xbox-cdn
+    log_ok "Scheduled daily at ${CRON_HOUR}:00"
 fi
 
 echo ""
-echo "=== 安装完成 ==="
+echo "======================================"
+log_ok "Installation complete!"
 echo ""
-echo "使用方法:"
-echo "  手动运行: $INSTALL_DIR/$SCRIPT_NAME"
-echo "  查看日志: tail -f /tmp/xbox-speedtest.log"
-echo "  编辑配置: vi $INSTALL_DIR/$CONFIG_NAME"
-echo "  卸载: rm $INSTALL_DIR/$SCRIPT_NAME $INSTALL_DIR/$CONFIG_NAME"
-echo ""
+echo "  Run test now:  xbox-speedtest.sh --mode $USER_MODE --apply"
+echo "  LuCI:          Services → Xbox CDN 优化"
+echo "======================================"
