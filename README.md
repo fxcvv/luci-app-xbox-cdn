@@ -1,135 +1,82 @@
-# Xbox CDN Speedtest for OpenWrt
+# luci-app-xbox-cdn
 
-Automatically test and optimize Xbox download speeds on OpenWrt by selecting the fastest CDN nodes for your network.
+Xbox CDN optimization for OpenWrt with LuCI web interface.
 
-## Problem
-
-Xbox downloads are often slow due to:
-- Suboptimal CDN node selection by DNS
-- Geographic routing issues
-- Network congestion on default nodes
-
-This script tests multiple CDN IPs and configures your router to use the fastest ones.
+Automatically tests multiple CDN nodes and applies the fastest IP to your DNS resolver — so Xbox downloads go direct through the optimal Chinese CDN instead of routing through your proxy.
 
 ## Features
 
-- Tests Xbox China CDN (xboxlive.cn)
-- Tests Akamai CDN nodes (xboxlive.com)
-- Tests Microsoft delivery CDN
-- Generates dnsmasq configuration automatically
-- Change detection - only reloads when needed
-- Concurrent downloads for accurate speed comparison
-- Prevents duplicate runs with file locking
+- **LuCI web UI** — run tests, configure schedule, switch modes, view live log
+- **SmartDNS & dnsmasq** — auto-detects which DNS service is on port 53
+- **Scheduled tests** — daily cron via UI, no manual editing
+- **Non-destructive** — SmartDNS mode merges a marked block into `custom.conf`, leaves everything else intact
+- **CLI friendly** — all scripts work standalone without LuCI
 
 ## Requirements
 
-- OpenWrt router
-- `curl` with HTTP/2 support
-- `dnsmasq` for DNS
-- `flock` (busybox version OK)
-- Basic tools: `awk`, `grep`, `sed`
+- OpenWrt with LuCI
+- SmartDNS or dnsmasq as DNS resolver
+- `curl`, `flock` (`util-linux-flock`)
 
 ## Installation
 
-**Quick Install (Recommended):**
-```bash
-wget -qO- https://raw.githubusercontent.com/fxcvv/xbox-cdn-speedtest/main/install.sh | sh
+```sh
+git clone https://github.com/fxcvv/luci-app-xbox-cdn.git
+cd luci-app-xbox-cdn
+sh install.sh
 ```
 
-See [QUICKSTART.md](QUICKSTART.md) for detailed installation guide.
+The installer:
+1. Detects SmartDNS or dnsmasq on port 53
+2. Installs scripts to `/usr/bin/`
+3. Installs LuCI app (Services → Xbox CDN 优化)
+4. Optionally sets up a daily cron job
 
-**Manual Installation:**
+## Usage
 
-```bash
-# Download script
-wget -O /etc/xbox-speedtest.sh https://raw.githubusercontent.com/fxcvv/xbox-cdn-speedtest/main/xbox-speedtest.sh
-chmod +x /etc/xbox-speedtest.sh
+**LuCI:** Services → Xbox CDN 优化
 
-# Download CDN IP list
-wget -O /etc/xbox-cdn-ips.conf https://raw.githubusercontent.com/fxcvv/xbox-cdn-speedtest/main/cdn-ips.conf
+**CLI:**
+```sh
+# Run test and apply immediately
+xbox-speedtest.sh --mode smartdns --apply
+xbox-speedtest.sh --mode dnsmasq --apply
 
-# Test run
-/etc/xbox-speedtest.sh
+# Check status
+xbox-cdn-run status
 
-# Add to cron (daily at 3:30 AM)
-echo "30 3 * * * /etc/xbox-speedtest.sh" >> /etc/crontabs/root
-/etc/init.d/cron restart
+# Enable daily cron at 3:00
+xbox-cdn-cron enable 3 0
+
+# Disable cron
+xbox-cdn-cron disable
 ```
 
-## Configuration
+## How it works
 
-Edit variables at the top of `xbox-speedtest.sh`:
+```
+Test CDN IPs (XboxCN / AkamaiCN / MS Delivery)
+  → Pick fastest per group
+  → Write address rules to DNS resolver
+  → Restart DNS service
 
-```bash
-DNSMASQ_CONF="/tmp/dnsmasq.d/xbox-cdn.conf"  # Output file
-LOG_FILE="/tmp/xbox-speedtest.log"           # Log location
-TEST_SIZE="10M"                               # Download size per test
-CONCURRENT=3                                  # Parallel downloads
-TIMEOUT=15                                    # Timeout per test
+SmartDNS: writes to /etc/smartdns/custom.conf
+          between # BEGIN xbox-cdn / # END xbox-cdn markers
+dnsmasq:  writes to /tmp/dnsmasq.d/xbox-cdn.conf
 ```
 
-## How It Works
+## File overview
 
-1. **Load CDN IPs** from `cdn-ips.conf`
-2. **Concurrent speed test** - Download test files from each IP
-3. **Select fastest** - Top 2 from each CDN group
-4. **Generate config** - Create dnsmasq address rules
-5. **Apply changes** - Reload dnsmasq only if config changed
-
-## Tested CDN Domains
-
-- `assets1.xboxlive.cn`, `assets2.xboxlive.cn`
-- `d1.xboxlive.cn`, `d2.xboxlive.cn`
-- `dlassets.xboxlive.cn`, `dlassets2.xboxlive.cn`
-- `assets1.xboxlive.com`, `assets2.xboxlive.com` (Akamai)
-- `dl.delivery.mp.microsoft.com`
-
-## Advanced Usage
-
-### With Local Cache Server
-
-If you run a local nginx cache for Xbox downloads:
-
-```bash
-# Edit the script to use your cache server
-CACHE_SERVER="192.168.1.100"
-# Uncomment and modify test URLs in the script
-```
-
-### Custom Test URLs
-
-The script uses Xbox CDN paths that always return valid files. You can modify:
-- `/filestable/` - Xbox game files path
-- Test file size and timeout
-
-## Troubleshooting
-
-**No speed improvement:**
-- Check if dnsmasq config was generated: `cat /tmp/dnsmasq.d/xbox-cdn.conf`
-- Verify dnsmasq reloaded: `/etc/init.d/dnsmasq status`
-- Test DNS resolution: `nslookup assets1.xboxlive.cn`
-
-**Script fails:**
-- Check dependencies: `which curl flock`
-- Review log: `tail -f /tmp/xbox-speedtest.log`
-- Test manually: Run script with verbose output
-
-**Timeouts during testing:**
-- Increase `TIMEOUT` value
-- Reduce `CONCURRENT` downloads
-- Check if test URLs are accessible
-
-## Contributing
-
-Contributions welcome! Please:
-1. Test on your OpenWrt setup
-2. Document any compatibility issues
-3. Submit PRs for improvements
+| File | Description |
+|---|---|
+| `xbox-speedtest.sh` | Core speed test and config generator |
+| `xbox-cdn-run` | Background launcher, status/log reader |
+| `xbox-cdn-cron` | Crontab manager |
+| `cdn-ips.conf` | CDN IP list to test |
+| `install.sh` | Interactive installer |
+| `uninstall.sh` | Clean removal |
+| `luci-app/` | LuCI web UI files |
 
 ## License
 
-GPL-3.0 - See LICENSE file
-
-## Credits
-
-Inspired by real-world Xbox download optimization on OpenWrt routers.
+GPL-3.0

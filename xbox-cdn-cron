@@ -17,8 +17,8 @@ case "$1" in
             sed -i "/$CRON_TAG/d" "$CRONTAB_FILE"
         fi
 
-        # Add new entry
-        echo "$MIN $HOUR * * * /usr/bin/xbox-speedtest.sh --mode $MODE --apply >/dev/null 2>&1 $CRON_TAG" >> "$CRONTAB_FILE"
+        # Add new entry - use xbox-cdn-run for proper status tracking
+        echo "$MIN $HOUR * * * /usr/bin/xbox-cdn-run start >/dev/null 2>&1 $CRON_TAG" >> "$CRONTAB_FILE"
 
         # Reload cron
         /etc/init.d/cron restart >/dev/null 2>&1

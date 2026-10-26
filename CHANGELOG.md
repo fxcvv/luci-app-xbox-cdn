@@ -1,35 +1,40 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+## [2.0.0] - 2026-10-26
 
-## [1.0.0] - 2024-10-25
+### Added
+- LuCI web interface (luci-app-xbox-cdn)
+  - Manual trigger with live log polling
+  - SmartDNS / dnsmasq mode switch
+  - Scheduled test configuration
+  - Status display (last run, current mode)
+- SmartDNS output mode (`--mode smartdns`)
+  - Merges rules into `/etc/smartdns/custom.conf` via marked block
+  - Non-destructive: preserves existing custom.conf content
+- `xbox-cdn-run` background launcher (start-stop-daemon based)
+- `xbox-cdn-cron` crontab manager
+- Auto-detect DNS service on port 53 during install
+- UCI config (`/etc/config/xbox-cdn`)
+
+### Fixed
+- `log()` no longer pollutes stdout, which caused timestamps to leak into IP results
+- Cron job now uses `xbox-cdn-run` for proper status tracking
+- `current-config` shows only the xbox-cdn block for SmartDNS mode
+
+### Removed
+- `config.example` (replaced by UCI config)
+- `QUICKSTART.md` (merged into README)
+- `RELEASE_NOTES.md` (merged into CHANGELOG)
+- `test-on-router.sh` (outdated)
+
+## [1.0.0] - 2026-10-25
 
 ### Added
 - Initial release
 - Automated CDN speed testing for Xbox downloads
-- Support for Xbox China CDN (xboxlive.cn)
-- Support for Akamai CDN nodes
-- Support for Microsoft delivery CDN
+- Support for Xbox China CDN (xboxlive.cn), Akamai, Microsoft Delivery
 - Concurrent download testing
 - Automatic dnsmasq configuration generation
-- Change detection to minimize dnsmasq reloads
+- Change detection to minimize reloads
 - File locking to prevent concurrent runs
-- Comprehensive logging
-- Interactive installation script
-- Uninstallation script
-- Quick start guide
-- Router test utility
-
-### Features
-- Configurable test parameters (size, timeout, concurrency)
-- Top-N IP selection per CDN group
-- Backup and rollback on configuration errors
-- Custom configuration file support
-- Cron job integration for automated optimization
-
-### Documentation
-- English README
-- Chinese README (README_CN.md)
-- Quick start guide (QUICKSTART.md)
-- Configuration examples
-- Troubleshooting guide
+- Interactive installation / uninstallation scripts

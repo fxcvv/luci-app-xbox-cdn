@@ -39,15 +39,23 @@ case "$1" in
     current-config)
         # Show current applied config
         case "$UCI_MODE" in
-            smartdns) CONF="/etc/smartdns/conf.d/xbox-cdn.conf" ;;
-            *)        CONF="/tmp/dnsmasq.d/xbox-cdn.conf" ;;
+            smartdns)
+                if [ -f /etc/smartdns/custom.conf ]; then
+                    echo "=== SmartDNS custom.conf (xbox-cdn block) ==="
+                    sed -n '/^# BEGIN xbox-cdn$/,/^# END xbox-cdn$/p' /etc/smartdns/custom.conf
+                else
+                    echo "尚未生成配置"
+                fi
+                ;;
+            *)
+                if [ -f /tmp/dnsmasq.d/xbox-cdn.conf ]; then
+                    echo "=== dnsmasq config ==="
+                    cat /tmp/dnsmasq.d/xbox-cdn.conf
+                else
+                    echo "尚未生成配置"
+                fi
+                ;;
         esac
-        if [ -f "$CONF" ]; then
-            echo "=== 当前生效配置 ($CONF) ==="
-            cat "$CONF"
-        else
-            echo "尚未生成配置"
-        fi
         ;;
 
     *)
