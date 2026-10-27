@@ -1,6 +1,6 @@
 #!/bin/sh
-# Xbox CDN - crontab manager
-# Usage: xbox-cdn-cron enable <hour> <min> | disable
+# Xbox CDN 优化 - 定时任务管理
+# 用法: xbox-cdn-cron enable <小时> <分钟> | disable | status
 
 CRONTAB_FILE="/etc/crontabs/root"
 CRON_TAG="# xbox-cdn-speedtest"
@@ -12,18 +12,18 @@ case "$1" in
         MODE=$(uci -q get xbox-cdn.settings.mode 2>/dev/null)
         [ -z "$MODE" ] && MODE="dnsmasq"
 
-        # Remove existing xbox-cdn entry
+        # 删除已有的 xbox-cdn 条目
         if [ -f "$CRONTAB_FILE" ]; then
             sed -i "/$CRON_TAG/d" "$CRONTAB_FILE"
         fi
 
-        # Add new entry - use xbox-cdn-run for proper status tracking
+        # 添加新条目，通过 xbox-cdn-run 启动以便记录状态
         echo "$MIN $HOUR * * * /usr/bin/xbox-cdn-run start >/dev/null 2>&1 $CRON_TAG" >> "$CRONTAB_FILE"
 
-        # Reload cron
+        # 重载 cron
         /etc/init.d/cron restart >/dev/null 2>&1
 
-        echo "OK: cron enabled at ${HOUR}:$(printf '%02d' $MIN)"
+        echo "已启用定时测速: 每天 ${HOUR}:$(printf '%02d' $MIN)"
         ;;
 
     disable)
@@ -31,19 +31,19 @@ case "$1" in
             sed -i "/$CRON_TAG/d" "$CRONTAB_FILE"
         fi
         /etc/init.d/cron restart >/dev/null 2>&1
-        echo "OK: cron disabled"
+        echo "已停用定时测速"
         ;;
 
     status)
         if [ -f "$CRONTAB_FILE" ] && grep -q "$CRON_TAG" "$CRONTAB_FILE"; then
             grep "$CRON_TAG" "$CRONTAB_FILE"
         else
-            echo "disabled"
+            echo "未启用"
         fi
         ;;
 
     *)
-        echo "Usage: $0 {enable <hour> <min>|disable|status}"
+        echo "用法: $0 {enable <小时> <分钟>|disable|status}"
         exit 1
         ;;
 esac
