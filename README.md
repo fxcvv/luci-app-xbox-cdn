@@ -2,15 +2,15 @@
 
 优化 Xbox 下载速度：自动测速选出最快的国内 CDN 节点，让下载直连，不占用代理带宽。
 
-适用于 OpenWrt，带 LuCI 网页界面。
+适用于 OpenWrt。提供 LuCI 网页界面，没有 LuCI 也能用命令行运行。
 
 ## 功能
 
-- **LuCI 界面**：手动测速、定时测速、切换写入目标、查看实时日志
+- **LuCI 界面（可选）**：手动测速、定时测速、切换写入目标、查看实时日志
 - **支持 SmartDNS 和 dnsmasq**：安装时自动检测 53 端口上的 DNS 服务
 - **定时测速**：在界面里设置，无需手动编辑 crontab
 - **无损写入**：SmartDNS 模式只在 `custom.conf` 里维护一个标记块，不影响其他配置
-- **可独立使用**：所有脚本都能脱离 LuCI 在命令行运行
+- **不依赖 LuCI**：核心功能都是 shell 脚本，没有 LuCI 时用命令行即可
 
 ## 关于联机
 
@@ -20,7 +20,7 @@
 
 ## 依赖
 
-- 带 LuCI 的 OpenWrt
+- OpenWrt（LuCI 可选，只用于网页界面）
 - SmartDNS 或 dnsmasq
 - `curl`、`flock`（`util-linux-flock`）
 
@@ -35,14 +35,14 @@ sh install.sh
 安装脚本会：
 1. 检测 53 端口上的 DNS 服务
 2. 把脚本安装到 `/usr/bin/`
-3. 安装 LuCI 界面（服务 → Xbox CDN 优化）
+3. 检测到 LuCI 时安装界面（服务 → Xbox CDN 优化），没有则跳过
 4. 询问是否开启每日定时测速
 
 卸载：`sh uninstall.sh`
 
 ## 使用
 
-**LuCI：** 服务 → Xbox CDN 优化
+**LuCI（如已安装）：** 服务 → Xbox CDN 优化
 
 **命令行：**
 ```sh

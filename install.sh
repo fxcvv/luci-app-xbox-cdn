@@ -82,8 +82,14 @@ else
     log_ok "已更新 UCI 配置（mode=$USER_MODE）"
 fi
 
-# 安装 LuCI 界面
-if [ -d luci-app/root ]; then
+# 安装 LuCI 界面（系统没有 LuCI 时跳过，只用命令行）
+HAS_LUCI=0
+[ -d /usr/share/luci/menu.d ] && [ -f /www/luci-static/resources/luci.js ] && HAS_LUCI=1
+
+if [ "$HAS_LUCI" = "0" ]; then
+    echo ""
+    log_warn "未检测到 LuCI，跳过界面安装，可使用命令行"
+elif [ -d luci-app/root ]; then
     echo ""
     echo ">> 安装 LuCI 界面..."
     cp luci-app/root/usr/share/luci/menu.d/luci-app-xbox-cdn.json \
@@ -118,5 +124,5 @@ echo "======================================"
 log_ok "安装完成"
 echo ""
 echo "  立即测速:  xbox-speedtest.sh --mode $USER_MODE --apply"
-echo "  LuCI 界面: 服务 → Xbox CDN 优化"
+[ "$HAS_LUCI" = "1" ] && echo "  LuCI 界面: 服务 → Xbox CDN 优化"
 echo "======================================"
